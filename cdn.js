@@ -2,14 +2,7 @@ const fetch = require('node-fetch');
 const { Subject, async, throwError } = require('rxjs');
 
 // Get CDN servers from environment
-// const { CDN_SERVERS, CDN_ORG } = process.env;
-
-const CDNS = {
-  SERVERS: ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).map(x => `localhost:${5000 + x}`).join(','),
-  ORG: 'localhost:5000'
-};
-
-const { SERVERS: CDN_SERVERS, ORG: CDN_ORG } = CDNS;
+const { CDN_SERVERS, CDN_ORG } = process.env;
 
 const VALID_SERVER_LIST = [];
 
