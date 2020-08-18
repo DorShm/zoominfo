@@ -1,9 +1,17 @@
 const fetch = require('node-fetch');
-const { Subject } = require('rxjs');
+const { Subject, async, throwError } = require('rxjs');
 
 // Get CDN servers from environment
-const { CDN_SERVERS, CDN_ORG } = process.env;
-const SERVER_DICTIONARY = {};
+// const { CDN_SERVERS, CDN_ORG } = process.env;
+
+const CDNS = {
+  SERVERS: ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).map(x => `localhost:${5000 + x}`).join(','),
+  ORG: 'localhost:5000'
+};
+
+const { SERVERS: CDN_SERVERS, ORG: CDN_ORG } = CDNS;
+
+const VALID_SERVER_LIST = [];
 
 if (!CDN_ORG) {
   console.error('No CDN origin was defined in environment');
@@ -11,74 +19,58 @@ if (!CDN_ORG) {
 
 if (!CDN_SERVERS) {
   console.warn('No CDN Servers were found in environment');
-} else {
-  for (const cdnServer of CDN_SERVERS.split(',')) {
-    SERVER_DICTIONARY[`http://${cdnServer}/stat`] = {
-      serverName: cdnServer,
-      failCounter: 0
-    }
-  } 
 }
 
-function serve(validCDNS$, path) {
+async function serve(path) {
   // Query CDN from fastest to slowest until resource is found
-  return new Promise((resolve, reject) => {
-    const subscription = validCDNS$.subscribe(async validCDN => {
+  for (const validCDN of VALID_SERVER_LIST) {
+    try {
+      const response = await fetch(`http://${validCDN.cdnServerName}${path}`);
 
-      // Fetch from all valid CDNS, lastly on origin CDN
-      await fetch(`http://${validCDN.serverName}${path}`).then(
-        response => {
-          resolve(response)
-          subscription.unsubscribe();
-        },
-        reason => {
-          // If origin CDN doesn't have the resource it doesn't exist
-          if (validCDN === CDN_ORG) {
-            reject(reason);
-          }
-        }
-      )
-    })
-  })
+      return response;
+    } catch (error) {
+      if (validCDN.cdnServerName === CDN_ORG) {
+        throw error;
+      }
+    }
+  }
+}
+
+async function checkServerStatus(serverName, attempts = 2) {
+  while (attempts > 0) {
+    
+    attempts--;
+
+    try {
+      const requestTime = Date.now();
+
+      const response = await fetch(`http://${serverName}/stat`, { timeout: 2000 })
+
+      // Return server response time
+      return (new Date(response.headers.get('date')) - requestTime);
+    } catch (error) { }
+  }
+
+  throw new Error(`Server ${serverName} failed status check`);
 }
 
 async function select() {
-  const fetchPromises = [];
-  
-  // Subject to send validCDNS in queue
-  const validCDNServersSubject = new Subject();
+  // Run all status request and add any valid CDN to the VALID_SERVER_LIST
+  for (const cdnServerName of CDN_SERVERS.split(',')) {
+    try {
+      const responseTime = await checkServerStatus(cdnServerName, 2);
 
-  // Run all status request and add any valid CDN to the validCDNServersSubject
-  for (const serverStatPath in SERVER_DICTIONARY) {
-    const fetchPromise = fetch(serverStatPath)
-    fetchPromises.push(fetchPromise);
-
-    fetchPromise.then(
-      () => {
-        console.log(SERVER_DICTIONARY[serverStatPath].serverName);
-        // Reset server fault counter
-        SERVER_DICTIONARY[serverStatPath].failCounter = 0;
-
-        // Valid CDN server found
-        validCDNServersSubject.next(SERVER_DICTIONARY[serverStatPath])
-      },
-      () => {
-        // Count server fault
-        SERVER_DICTIONARY[serverStatPath].failCounter++;
-
-        if (SERVER_DICTIONARY[serverStatPath].failCounter > 1) {
-          delete SERVER_DICTIONARY[serverStatPath];
-        }
-      }
-    )
+      VALID_SERVER_LIST.push({
+        cdnServerName,
+        responseTime
+      });
+    } catch (error) {}
   }
-  
-  // After all fetch requests are settled push origin CDN server
-  Promise.allSettled(fetchPromises).then((_) => {
-    validCDNServersSubject.next(CDN_ORG)
-  })
 
-  return serve.bind(this, validCDNServersSubject.asObservable());
+  VALID_SERVER_LIST.sort((a, b) => a.responseTime > b.responseTime ? 1 : -1);
+  VALID_SERVER_LIST.push({ cdnServerName: CDN_ORG });
+
+  return serve;
 }
 
 module.exports = {

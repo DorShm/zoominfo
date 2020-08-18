@@ -6,9 +6,15 @@ async function main() {
   // bonus section
   // serve = ....
 
-  const response = await serve('/stat');
+  let response;
 
-  console.log(response);
+  try {
+    response = await serve('/api/fetch-items');
+  } catch (error) {
+    console.log(error);
+  }
+
+  console.log(await response.text());
 }
 
 main().then(
