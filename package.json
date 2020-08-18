@@ -1,0 +1,24 @@
+{
+  "name": "assignment",
+  "version": "1.0.0",
+  "description": "Zoominfo Home Assignment",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DorShm/zoominfo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DorShm/zoominfo/issues"
+  },
+  "homepage": "https://github.com/DorShm/zoominfo#readme",
+  "dependencies": {
+    "node-fetch": "^2.6.0",
+    "rxjs": "^6.6.2"
+  }
+}
