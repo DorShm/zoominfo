@@ -66,7 +66,7 @@ async function select() {
         // Count server fault
         SERVER_DICTIONARY[serverStatPath].failCounter++;
 
-        if (SERVER_DICTIONARY[serverStatPath].failCounter > 0) {
+        if (SERVER_DICTIONARY[serverStatPath].failCounter > 1) {
           delete SERVER_DICTIONARY[serverStatPath];
         }
       }
